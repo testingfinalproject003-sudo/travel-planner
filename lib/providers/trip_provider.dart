@@ -1,82 +1,135 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'dart:async';
+import '../services/trip_service.dart';
+import '../services/chat_service.dart';
 import '../models/trip_model.dart';
 import '../models/activity_model.dart';
-import '../services/trip_service.dart';
 
 class TripProvider extends ChangeNotifier {
   final TripService _tripService = TripService();
+  final ChatService _chatService = ChatService();
+  
   List<TripModel> _trips = [];
+  List<TripModel> get activeTrips => _trips.where((t) => t.isActive).toList();
+  List<TripModel> get upcomingTrips => _trips.where((t) => t.isUpcoming).toList();
+  List<TripModel> get pastTrips => _trips.where((t) => t.isPast).toList();
   bool _isLoading = false;
+  String? _error;
   StreamSubscription<List<TripModel>>? _tripsSubscription;
 
   List<TripModel> get trips => _trips;
   bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  List<TripModel> get activeTrips => _trips.where((t) => t.status == 'active').toList();
-  List<TripModel> get upcomingTrips => _trips.where((t) => t.status == 'upcoming').toList();
-  List<TripModel> get pastTrips => _trips.where((t) => t.status == 'past').toList();
+  void init(String userId) {
+    _loadTrips(userId);
+  }
 
-  void loadUserTrips(String userId) {
-    _isLoading = true;
+  void _loadTrips(String userId) {
     _tripsSubscription?.cancel();
-    _tripsSubscription = _tripService.getUserTrips(userId).listen((tripsList) {
-      _trips = tripsList;
-      _isLoading = false;
-      notifyListeners();
-    }, onError: (_) {
-      _isLoading = false;
+    _tripsSubscription = _tripService.getUserTrips(userId).listen((trips) {
+      _trips = trips;
       notifyListeners();
     });
   }
 
-  Future<void> createTrip({
-    required String title,
-    required String destination,
-    required DateTime startDate,
-    required DateTime endDate,
-    required String notes,
-    required String userId,
-  }) async {
-    final id = const Uuid().v4();
-    final newTrip = TripModel(
-      id: id,
-      title: title,
-      destination: destination,
-      notes: notes,
-      createdBy: userId,
-      status: 'upcoming',
-      startDate: startDate,
-      endDate: endDate,
-      createdAt: DateTime.now(),
-      memberIds: [userId],
-    );
-    await _tripService.createTrip(newTrip);
+  /// Clear all state (called on logout)
+  void clear() {
+    _tripsSubscription?.cancel();
+    _tripsSubscription = null;
+    _trips = [];
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
   }
 
-  Future<void> addActivity(String tripId, String dayId, String name, String time, String type, String notes) async {
-    final activity = ActivityModel(
-      id: const Uuid().v4(),
-      name: name,
-      time: time,
-      type: type,
-      notes: notes,
-    );
-    await _tripService.addActivity(tripId, dayId, activity);
+  Future<String?> createTrip(TripModel trip) async {
+    _setLoading(true);
+    try {
+      final tripId = await _tripService.createTrip(trip);
+      
+      await _chatService.createTripGroupChat(
+        tripId: tripId,
+        destination: trip.destination,
+        memberIds: trip.memberIds,
+      );
+      
+      _error = null;
+      _setLoading(false);
+      return tripId;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      return null;
+    }
   }
 
-  Future<void> deleteActivity(String tripId, String dayId, String activityId) async {
-    await _tripService.deleteActivity(tripId, dayId, activityId);
+  Future<void> updateTrip(TripModel trip) async {
+    _setLoading(true);
+    try {
+      await _tripService.updateTrip(trip);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    }
+    _setLoading(false);
   }
 
-  Future<void> updateTripStatus(String tripId, String status) async {
-    await _tripService.updateTripStatus(tripId, status);
+  Future<void> deleteTrip(String tripId) async {
+    _setLoading(true);
+    try {
+      await _tripService.deleteTrip(tripId);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    }
+    _setLoading(false);
   }
 
-  Future<void> duplicateTrip(TripModel trip) async {
-    final newId = const Uuid().v4();
-    await _tripService.duplicateTrip(trip, newId);
+  Future<void> suggestActivity(String tripId, ActivityModel activity) async {
+    _setLoading(true);
+    try {
+      await _tripService.suggestActivity(tripId, activity);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    }
+    _setLoading(false);
+  }
+
+  Future<void> voteActivity(
+    String tripId,
+    String activityId,
+    String userId,
+    bool isUpVote,
+    int totalMembers,
+  ) async {
+    try {
+      await _tripService.voteActivity(
+        tripId,
+        activityId,
+        userId,
+        isUpVote,
+        totalMembers,
+      );
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Stream<List<ActivityModel>> getActivities(String tripId) {
+    return _tripService.getActivities(tripId);
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
   }
 
   @override

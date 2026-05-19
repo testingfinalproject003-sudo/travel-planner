@@ -3,9 +3,14 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_dimensions.dart';
 
 class ChatInputBar extends StatefulWidget {
-  final Function(String) onSend;
+  final ValueChanged<String> onSend;
+  final bool isLoading;
 
-  const ChatInputBar({super.key, required this.onSend});
+  const ChatInputBar({
+    super.key,
+    required this.onSend,
+    this.isLoading = false,
+  });
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -13,11 +18,16 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar> {
   final TextEditingController _controller = TextEditingController();
+  bool _hasText = false;
 
-  void _handleSend() {
-    if (_controller.text.trim().isEmpty) return;
-    widget.onSend(_controller.text);
-    _controller.clear();
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      setState(() {
+        _hasText = _controller.text.trim().isNotEmpty;
+      });
+    });
   }
 
   @override
@@ -26,45 +36,79 @@ class _ChatInputBarState extends State<ChatInputBar> {
     super.dispose();
   }
 
+  void _send() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    widget.onSend(text);
+    _controller.clear();
+  }
+
   @override
-  Widget build(BuildContext buildContext) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.md, vertical: AppDimensions.sm),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
-      ),
-      child: SafeArea(
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 0.5),
+          ),
+        ),
         child: Row(
           children: [
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-                ),
-                child: TextField(
-                  controller: _controller,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Message the group...',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: AppDimensions.lg, vertical: 10),
+              child: TextField(
+                controller: _controller,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha:0.6)),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 1),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: AppDimensions.sm),
-            CircleAvatar(
-              backgroundColor: AppColors.primary,
-              radius: 20,
-              child: IconButton(
-                icon: const Icon(Icons.send, color: AppColors.white, size: 18),
-                onPressed: _handleSend,
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _hasText && !widget.isLoading ? _send : null,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _hasText && !widget.isLoading ? AppColors.primary : AppColors.primaryMuted,
+                  shape: BoxShape.circle,
+                ),
+                child: widget.isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                        ),
+                      )
+                    : Icon(
+                        Icons.send,
+                        color: _hasText && !widget.isLoading
+                            ? AppColors.white
+                            : AppColors.textMuted,
+                        size: 20,
+                      ),
               ),
-            )
+            ),
           ],
         ),
       ),

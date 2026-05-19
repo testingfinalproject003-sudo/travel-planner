@@ -4,89 +4,117 @@ class TripModel {
   final String id;
   final String title;
   final String destination;
-  final String notes;
-  final String createdBy;
-  final String status;
+  final double? destinationLat;
+  final double? destinationLng;
   final DateTime startDate;
   final DateTime endDate;
-  final DateTime createdAt;
+  final String? notes;
   final List<String> memberIds;
+  final String createdBy;
+  final String status;
+  final DateTime createdAt;
 
   TripModel({
     required this.id,
     required this.title,
     required this.destination,
-    required this.notes,
-    required this.createdBy,
-    required this.status,
+    this.destinationLat,
+    this.destinationLng,
     required this.startDate,
     required this.endDate,
+    this.notes,
+    this.memberIds = const [],
+    required this.createdBy,
+    this.status = 'upcoming',
     required this.createdAt,
-    required this.memberIds,
   });
 
-  bool get isActive => status == 'active';
-  bool get isPast => status == 'past';
-  int get durationDays => endDate.difference(startDate).inDays + 1;
-
-  factory TripModel.fromMap(Map<String, dynamic> map, String id) {
+  factory TripModel.fromMap(Map<String, dynamic> map) {
     return TripModel(
-      id: id,
+      id: map['id'] ?? '',
       title: map['title'] ?? '',
       destination: map['destination'] ?? '',
-      notes: map['notes'] ?? '',
+      destinationLat: map['destinationLat']?.toDouble(),
+      destinationLng: map['destinationLng']?.toDouble(),
+      startDate: (map['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endDate: (map['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      notes: map['notes'],
+      memberIds: List<String>.from(map['memberIds'] ?? []),
       createdBy: map['createdBy'] ?? '',
       status: map['status'] ?? 'upcoming',
-      startDate: map['startDate'] is Timestamp
-          ? (map['startDate'] as Timestamp).toDate()
-          : DateTime.now(),
-      endDate: map['endDate'] is Timestamp
-          ? (map['endDate'] as Timestamp).toDate()
-          : DateTime.now(),
-      createdAt: map['createdAt'] is Timestamp
-          ? (map['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
-      memberIds: List<String>.from(map['memberIds'] ?? []),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'title': title,
       'destination': destination,
-      'notes': notes,
-      'createdBy': createdBy,
-      'status': status,
+      'destinationLat': destinationLat,
+      'destinationLng': destinationLng,
       'startDate': Timestamp.fromDate(startDate),
       'endDate': Timestamp.fromDate(endDate),
-      'createdAt': Timestamp.fromDate(createdAt),
+      'notes': notes,
       'memberIds': memberIds,
+      'createdBy': createdBy,
+      'status': status,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
+  }
+
+  int get durationDays {
+    return endDate.difference(startDate).inDays;
+  }
+
+  List<DateTime> get tripDays {
+    final days = <DateTime>[];
+    for (int i = 0; i < durationDays; i++) {
+      days.add(startDate.add(Duration(days: i)));
+    }
+    return days;
+  }
+
+  bool get isActive {
+    final now = DateTime.now();
+    return now.isAfter(startDate) && now.isBefore(endDate);
+  }
+
+  bool get isUpcoming {
+    return DateTime.now().isBefore(startDate);
+  }
+
+  bool get isPast {
+    return DateTime.now().isAfter(endDate);
   }
 
   TripModel copyWith({
     String? id,
     String? title,
     String? destination,
-    String? notes,
-    String? createdBy,
-    String? status,
+    double? destinationLat,
+    double? destinationLng,
     DateTime? startDate,
     DateTime? endDate,
-    DateTime? createdAt,
+    String? notes,
     List<String>? memberIds,
+    String? createdBy,
+    String? status,
+    DateTime? createdAt,
   }) {
     return TripModel(
       id: id ?? this.id,
       title: title ?? this.title,
       destination: destination ?? this.destination,
-      notes: notes ?? this.notes,
-      createdBy: createdBy ?? this.createdBy,
-      status: status ?? this.status,
+      destinationLat: destinationLat ?? this.destinationLat,
+      destinationLng: destinationLng ?? this.destinationLng,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
-      createdAt: createdAt ?? this.createdAt,
+      notes: notes ?? this.notes,
       memberIds: memberIds ?? this.memberIds,
+      createdBy: createdBy ?? this.createdBy,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

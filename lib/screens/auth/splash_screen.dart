@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import '../../theme/app_dimensions.dart';
-import '../../widgets/common/app_button.dart';
+import '../../providers/auth_provider.dart';
+import '../../navigation/app_router.dart';
+import 'package:provider/provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,29 +12,43 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  bool _showButtons = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2));
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(CurvedAnimation(parent: _controller, curve: Curves.fastOutSlowIn));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
 
     _controller.forward();
-    _checkStatus();
-  }
 
-  void _checkStatus() async {
-    await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (auth.isAuthenticated) {
-      Navigator.pushReplacementNamed(context, '/home');
-    }
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.isLoggedIn) {
+        Navigator.pushReplacementNamed(context, AppRouter.main);
+      } else {
+        setState(() => _showButtons = true);
+      }
+    });
   }
 
   @override
@@ -45,19 +58,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   @override
-  Widget build(BuildContext BuildContext) {
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.primaryDeeper, AppColors.primary, AppColors.primaryLight],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: SafeArea(
+      backgroundColor: AppColors.primary,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
               FadeTransition(
@@ -66,35 +74,80 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   position: _slideAnimation,
                   child: Column(
                     children: [
-                      const Icon(Icons.airplanemode_active_rounded, color: AppColors.white, size: 80),
-                      const SizedBox(height: AppDimensions.md),
-                      Text('Voyago', style: AppTextStyles.heading1.copyWith(color: AppColors.white, fontSize: 36)),
-                      const SizedBox(height: AppDimensions.xs),
-                      const Text('Plan your perfect journey effortlessly', style: AppTextStyles.whiteMuted),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.white.withValues(alpha:0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.flight_takeoff,
+                          color: AppColors.white,
+                          size: 36,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Travel Planner',
+                        style: AppTextStyles.heading1.copyWith(
+                          color: AppColors.white,
+                          fontSize: 32,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Plan together. Travel better.',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.white.withValues(alpha:0.7),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 ),
               ),
               const Spacer(),
-              Padding(
-                padding: const EdgeInsets.all(AppDimensions.xl),
-                child: Column(
-                  children: [
-                    AppButton(
-                      label: 'Get Started',
-                      isFullWidth: true,
-                      onPressed: () => Navigator.pushNamed(context, '/signup'),
+              if (_showButtons) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pushNamed(context, AppRouter.signup),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.white,
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    const SizedBox(height: AppDimensions.md),
-                    AppButton(
-                      label: 'Sign In',
-                      variant: ButtonVariant.outline,
-                      isFullWidth: true,
-                      onPressed: () => Navigator.pushNamed(context, '/login'),
+                    child: const Text(
+                      'Get started',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
-                  ],
+                  ),
                 ),
-              )
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pushNamed(context, AppRouter.login),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.white,
+                      side: const BorderSide(color: AppColors.white, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Sign in',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 120),
+              ],
             ],
           ),
         ),

@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
-import '../../models/message_model.dart';
+import 'package:flutter/material.dart' hide DateUtils;
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_dimensions.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import '../../models/message_model.dart';
+import '../../utils/date_utils.dart';
 
 class MessageBubble extends StatelessWidget {
   final MessageModel message;
@@ -16,44 +16,84 @@ class MessageBubble extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext buildContext) {
+  Widget build(BuildContext context) {
+    if (message.isSystem) {
+      return _buildSystemMessage();
+    }
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: AppDimensions.xs, horizontal: AppDimensions.md),
+        margin: EdgeInsets.only(
+          left: isMe ? 64 : 12,
+          right: isMe ? 12 : 64,
+          bottom: 8,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isMe ? AppColors.primary : AppColors.cardBg,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha:0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
         child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isMe)
-              Padding(
-                padding: const EdgeInsets.only(left: AppDimensions.xs, bottom: 2),
-                child: Text(message.senderName, style: AppTextStyles.label),
-              ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppDimensions.lg, vertical: AppDimensions.sm),
-              decoration: BoxDecoration(
-                color: isMe ? AppColors.primary : AppColors.white,
-                border: isMe ? null : Border.all(color: AppColors.border, width: 0.5),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(14),
-                  topRight: const Radius.circular(14),
-                  bottomLeft: Radius.circular(isMe ? 14 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 14),
+            if (!isMe) ...[
+              Text(
+                message.senderName,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isMe ? AppColors.white.withValues(alpha:0.8) : AppColors.primary,
                 ),
               ),
-              child: Text(
-                message.text,
-                style: isMe ? AppTextStyles.whiteBody : AppTextStyles.body,
+              const SizedBox(height: 4),
+            ],
+            Text(
+              message.text,
+              style: TextStyle(
+                fontSize: 14,
+                color: isMe ? AppColors.white : AppColors.textMain,
+                height: 1.4,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppDimensions.xs, vertical: 2),
-              child: Text(
-                timeago.format(message.timestamp),
-                style: isMe ? AppTextStyles.small.copyWith(fontSize: 9) : AppTextStyles.small.copyWith(fontSize: 9),
+            const SizedBox(height: 4),
+            Text(
+              DateUtils.timeAgo(message.timestamp),
+              style: TextStyle(
+                fontSize: 10,
+                color: isMe ? AppColors.white.withValues(alpha:0.6) : AppColors.textMuted,
               ),
-            )
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemMessage() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.primaryMuted,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        ),
+        child: Text(
+          message.text,
+          style: AppTextStyles.caption.copyWith(color: AppColors.primary),
         ),
       ),
     );

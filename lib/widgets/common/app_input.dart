@@ -1,72 +1,76 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
-import '../../theme/app_dimensions.dart';
+// import '../../theme/app_dimensions.dart';
 
-class AppInput extends StatefulWidget {
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-  final IconData prefixIcon;
+class AppInput extends StatelessWidget {
+  final TextEditingController? controller;
+  final String? hintText;
+  final String? labelText;
+  final String? errorText;
   final bool obscureText;
   final TextInputType keyboardType;
-  final String? Function(String?)? validator;
-  final int maxLines;
+  final TextInputAction textInputAction;
+  final VoidCallback? onTap;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final Widget? prefixIcon;
+  final Widget? suffixIcon;
+  final int? maxLines;
+  final int? minLines;
+  final bool readOnly;
+  final FocusNode? focusNode;
+  final String? Function(String?)? validator;
 
   const AppInput({
     super.key,
-    required this.label,
-    required this.hint,
-    required this.controller,
-    required this.prefixIcon,
+    this.controller,
+    this.hintText,
+    this.labelText,
+    this.errorText,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
-    this.validator,
-    this.maxLines = 1,
+    this.textInputAction = TextInputAction.next,
+    this.onTap,
     this.onChanged,
+    this.onSubmitted,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.maxLines = 1,
+    this.minLines,
+    this.readOnly = false,
+    this.focusNode,
+    this.validator,
   });
 
   @override
-  State<AppInput> createState() => _AppInputState();
-}
-
-class _AppInputState extends State<AppInput> {
-  late bool _obscureState;
-
-  @override
-  void initState() {
-    super.initState();
-    _obscureState = widget.obscureText;
-  }
-
-  @override
-  Widget build(BuildContext buildContext) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(widget.label, style: AppTextStyles.label),
-        const SizedBox(height: AppDimensions.xs),
-        TextFormField(
-          controller: widget.controller,
-          obscureText: _obscureState,
-          keyboardType: widget.keyboardType,
-          validator: widget.validator,
-          maxLines: widget.maxLines,
-          onChanged: widget.onChanged,
-          style: AppTextStyles.body,
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            prefixIcon: Icon(widget.prefixIcon, color: AppColors.textMuted),
-            suffixIcon: widget.obscureText
-                ? IconButton(
-              icon: Icon(_obscureState ? Icons.visibility_off : Icons.visibility, color: AppColors.textMuted),
-              onPressed: () => setState(() => _obscureState = !_obscureState),
-            )
-                : null,
-          ),
-        ),
-      ],
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onTap: onTap,
+      onChanged: onChanged,
+      onFieldSubmitted: onSubmitted,
+      maxLines: maxLines,
+      minLines: minLines,
+      readOnly: readOnly,
+      focusNode: focusNode,
+      validator: validator,
+      style: const TextStyle(fontSize: 15, color: AppColors.textMain),
+      decoration: InputDecoration(
+        hintText: hintText,
+        labelText: labelText,
+        errorText: errorText,
+        prefixIcon: prefixIcon != null
+            ? Padding(
+                padding: const EdgeInsets.only(left: 12, right: 8),
+                child: prefixIcon,
+              )
+            : null,
+        suffixIcon: suffixIcon,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
     );
   }
 }

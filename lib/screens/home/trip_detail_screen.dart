@@ -35,11 +35,15 @@ class TripDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  WeatherCard(destination: trip.destination),
+                  WeatherCard(city: trip.destination),
                 ],
               ),
             ),
-            ChatScreen(tripId: trip.id),
+            ChatScreen(
+              chatId: trip.id,
+              chatName: 'Trip to ${trip.destination}',
+              isTripChat: true,
+            ),
           ],
         ),
       ),

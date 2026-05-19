@@ -1,55 +1,62 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-
-enum AvatarSize { sm, md, lg }
+import '../../theme/app_dimensions.dart';
 
 class AppAvatar extends StatelessWidget {
-  final String name;
-  final AvatarSize size;
-  final Color backgroundColor;
-  final Color textColor;
+  final String? imageUrl;
+  final String initials;
+  final double size;
+  final Color? backgroundColor;
+  final Color? textColor;
+  final VoidCallback? onTap;
 
   const AppAvatar({
     super.key,
-    required this.name,
-    this.size = AvatarSize.md,
-    this.backgroundColor = AppColors.primaryMuted,
-    this.textColor = AppColors.primary,
+    this.imageUrl,
+    required this.initials,
+    this.size = AppDimensions.avatarMd,
+    this.backgroundColor,
+    this.textColor,
+    this.onTap,
   });
 
-  String get initials {
-    final tokens = name.trim().split(' ');
-    String initial = '';
-    if (tokens.isNotEmpty && tokens[0].isNotEmpty) {
-      initial += tokens[0][0];
-    }
-    if (tokens.length > 1 && tokens[1].isNotEmpty) {
-      initial += tokens[1][0];
-    }
-    return initial.toUpperCase();
-  }
-
-  double get radiusDimensions {
-    switch (size) {
-      case AvatarSize.sm: return 14;
-      case AvatarSize.md: return 20;
-      case AvatarSize.lg: return 28;
-    }
-  }
-
   @override
-  Widget build(BuildContext buildContext) {
-    return CircleAvatar(
-      radius: radiusDimensions,
-      backgroundColor: backgroundColor,
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w600,
-          fontSize: radiusDimensions * 0.8,
-        ),
+  Widget build(BuildContext context) {
+    final bg = backgroundColor ?? AppColors.primaryMuted;
+    final fg = textColor ?? AppColors.primary;
+
+    Widget avatar = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: bg,
+        shape: BoxShape.circle,
+        image: imageUrl != null && imageUrl!.isNotEmpty
+            ? DecorationImage(
+                image: NetworkImage(imageUrl!),
+                fit: BoxFit.cover,
+              )
+            : null,
+        border: Border.all(color: AppColors.border, width: 0.5),
       ),
+      child: imageUrl == null || imageUrl!.isEmpty
+          ? Center(
+              child: Text(
+                initials,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: size * 0.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          : null,
     );
+
+    if (onTap != null) {
+      avatar = GestureDetector(onTap: onTap, child: avatar);
+    }
+
+    return avatar;
   }
 }

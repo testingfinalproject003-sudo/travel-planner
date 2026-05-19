@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../utils/validators.dart';
-import '../../widgets/common/app_input.dart';
-import '../../widgets/common/app_button.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import '../../theme/app_dimensions.dart';
+import '../../providers/auth_provider.dart';
+import '../../navigation/app_router.dart';
+import '../../utils/validators.dart';
+import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_input.dart';
+import 'package:provider/provider.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -21,33 +21,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  String _passStrength = 'None';
-  Color _strengthColor = AppColors.textMuted;
-
-  void _checkStrength(String val) {
-    if (val.isEmpty) {
-      setState(() { _passStrength = 'None'; _strengthColor = AppColors.textMuted; });
-    } else if (val.length < 6) {
-      setState(() { _passStrength = 'Weak'; _strengthColor = AppColors.danger; });
-    } else if (val.length < 10) {
-      setState(() { _passStrength = 'Medium'; _strengthColor = AppColors.gold; });
-    } else {
-      setState(() { _passStrength = 'Strong'; _strengthColor = AppColors.success; });
-    }
-  }
-
-  void _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    final provider = Provider.of<AuthProvider>(context, listen: false);
-    final status = await provider.signup(_nameController.text, _emailController.text, _passwordController.text);
-
-    if (!mounted) return;
-    if (status) {
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'Error during signup')));
-    }
-  }
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   @override
   void dispose() {
@@ -58,77 +33,144 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext buildContext) {
-    final loading = Provider.of<AuthProvider>(buildContext).isLoading;
+  Future<void> _signUp() async {
+    if (!_formKey.currentState!.validate()) return;
 
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signUp(
+      _nameController.text.trim(),
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (success && mounted) {
+      Navigator.pushReplacementNamed(context, AppRouter.main);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.error ?? 'Sign up failed')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textMain),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimensions.xl),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
-            child: ListView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Join Voyago', style: AppTextStyles.heading1),
-                const SizedBox(height: AppDimensions.xxl),
+                Text('Create account', style: AppTextStyles.heading1),
+                const SizedBox(height: 8),
+                Text(
+                  'Start planning trips with your friends',
+                  style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 32),
                 AppInput(
-                  label: 'Full Name',
-                  hint: 'John Doe',
                   controller: _nameController,
-                  prefixIcon: Icons.person_outline,
-                  validator: (v) => Validators.validateRequired(v, 'Name'),
+                  labelText: 'Full Name',
+                  hintText: 'Enter your name',
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.person_outline, color: AppColors.textMuted, size: 20),
+                  validator: Validators.name,
                 ),
-                const SizedBox(height: AppDimensions.lg),
+                const SizedBox(height: 16),
                 AppInput(
-                  label: 'Email Address',
-                  hint: 'john@doe.com',
                   controller: _emailController,
-                  prefixIcon: Icons.email_outlined,
+                  labelText: 'Email',
+                  hintText: 'Enter your email',
                   keyboardType: TextInputType.emailAddress,
-                  validator: Validators.validateEmail,
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.email_outlined, color: AppColors.textMuted, size: 20),
+                  validator: Validators.email,
                 ),
-                const SizedBox(height: AppDimensions.lg),
+                const SizedBox(height: 16),
                 AppInput(
-                  label: 'Password',
-                  hint: '••••••••',
                   controller: _passwordController,
-                  prefixIcon: Icons.lock_outlined,
-                  obscureText: true,
-                  onChanged: _checkStrength,
-                  validator: Validators.validatePassword,
+                  labelText: 'Password',
+                  hintText: 'Create a password',
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.next,
+                  prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textMuted, size: 20),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                  validator: Validators.password,
                 ),
-                const SizedBox(height: AppDimensions.xs),
+                const SizedBox(height: 16),
+                AppInput(
+                  controller: _confirmPasswordController,
+                  labelText: 'Confirm Password',
+                  hintText: 'Confirm your password',
+                  obscureText: _obscureConfirm,
+                  textInputAction: TextInputAction.done,
+                  prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textMuted, size: 20),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+                  validator: Validators.password,
+                  onSubmitted: (_) => _signUp(),
+                ),
+                const SizedBox(height: 32),
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
+                    return AppButton(
+                      text: 'Create account',
+                      onPressed: _signUp,
+                      isLoading: authProvider.isLoading,
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Password Strength: ', style: AppTextStyles.small),
-                    Text(_passStrength, style: AppTextStyles.small.copyWith(color: _strengthColor, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Already have an account? ',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushReplacementNamed(context, AppRouter.login),
+                      child: Text(
+                        'Sign in',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: AppDimensions.lg),
-                AppInput(
-                  label: 'Confirm Password',
-                  hint: '••••••••',
-                  controller: _confirmPasswordController,
-                  prefixIcon: Icons.lock_clock_outlined,
-                  obscureText: true,
-                  validator: (v) => Validators.validateConfirmPassword(v, _passwordController.text),
-                ),
-                const SizedBox(height: AppDimensions.xl),
-                AppButton(
-                  label: 'Create Account',
-                  isLoading: loading,
-                  isFullWidth: true,
-                  onPressed: _submit,
-                ),
-                const SizedBox(height: AppDimensions.lg),
-                Center(
-                  child: GestureDetector(
-                    onTap: () => Navigator.pushReplacementNamed(context, '/login'),
-                    child: Text('Already have an account? Login', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600)),
-                  ),
-                )
               ],
             ),
           ),

@@ -1,44 +1,40 @@
 class PlaceModel {
   final String id;
   final String name;
-  final String category;
-  final String address;
-  final double rating;
-  final double distance;
-  final double lat;
-  final double lng;
+  final String? description;
+  final String? imageUrl;
+  final double? lat;
+  final double? lng;
+  final String? category;
+  final double? rating;
+  final String? address;
+  final double? distance;
 
   PlaceModel({
     required this.id,
     required this.name,
-    required this.category,
-    required this.address,
-    required this.rating,
-    required this.distance,
-    required this.lat,
-    required this.lng,
+    this.description,
+    this.imageUrl,
+    this.lat,
+    this.lng,
+    this.category,
+    this.rating,
+    this.address,
+    this.distance,
   });
 
   factory PlaceModel.fromMap(Map<String, dynamic> map) {
-    double parsedRating = 0.0;
-    if (map['rating'] != null) {
-      parsedRating = (map['rating'] as num).toDouble();
-    }
-
-    String cat = 'Attraction';
-    if (map['categories'] != null && (map['categories'] as List).isNotEmpty) {
-      cat = map['categories'][0]['name'] ?? 'Attraction';
-    }
-
     return PlaceModel(
-      id: map['fsq_id'] ?? '',
+      id: map['id'] ?? '',
       name: map['name'] ?? '',
-      category: cat,
-      address: map['location']?['formatted_address'] ?? 'No Address available',
-      rating: parsedRating,
-      distance: (map['distance'] as num?)?.toDouble() ?? 0.0,
-      lat: map['geocodes']?['main']?['latitude']?.toDouble() ?? 0.0,
-      lng: map['geocodes']?['main']?['longitude']?.toDouble() ?? 0.0,
+      description: map['description'],
+      imageUrl: map['imageUrl'],
+      lat: map['lat']?.toDouble(),
+      lng: map['lng']?.toDouble(),
+      category: map['category'],
+      rating: map['rating']?.toDouble(),
+      address: map['address'],
+      distance: map['distance']?.toDouble(),
     );
   }
 
@@ -46,12 +42,14 @@ class PlaceModel {
     return {
       'id': id,
       'name': name,
-      'category': category,
-      'address': address,
-      'rating': rating,
-      'distance': distance,
+      'description': description,
+      'imageUrl': imageUrl,
       'lat': lat,
       'lng': lng,
+      'category': category,
+      'rating': rating,
+      'address': address,
+      'distance': distance,
     };
   }
 }

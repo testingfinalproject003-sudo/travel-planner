@@ -1,53 +1,45 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_dimensions.dart';
 
 class AppBadge extends StatelessWidget {
-  final String label;
-  final String variant;
+  final int count;
+  final Widget child;
 
   const AppBadge({
     super.key,
-    required this.label,
-    required this.variant,
+    required this.count,
+    required this.child,
   });
 
   @override
-  Widget build(BuildContext buildContext) {
-    Color bg;
-    Color text;
-
-    switch (variant) {
-      case 'active':
-        bg = AppColors.successBg;
-        text = AppColors.success;
-        break;
-      case 'upcoming':
-        bg = AppColors.primaryMuted;
-        text = AppColors.primary;
-        break;
-      case 'past':
-      default:
-        bg = const Color(0xFFECEFF1);
-        text = const Color(0xFF546E7A);
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimensions.sm, vertical: AppDimensions.xs),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          color: text,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
-      ),
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        if (count > 0)
+          Positioned(
+            top: -4,
+            right: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: AppColors.danger,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

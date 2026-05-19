@@ -1,75 +1,143 @@
-import 'package:flutter/material.dart';
-import '../../models/trip_model.dart';
-import '../common/app_card.dart';
-import '../common/app_badge.dart';
+import 'package:flutter/material.dart' hide DateUtils;
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/app_dimensions.dart';
+import '../../models/trip_model.dart';
 import '../../utils/date_utils.dart';
 
 class TripCard extends StatelessWidget {
   final TripModel trip;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const TripCard({
     super.key,
     required this.trip,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
-  Widget build(BuildContext buildContext) {
-    return AppCard(
+  Widget build(BuildContext context) {
+    return GestureDetector(
       onTap: onTap,
-      margin: const EdgeInsets.only(bottom: AppDimensions.md),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppDimensions.md),
-            decoration: BoxDecoration(
-              color: AppColors.primaryMuted,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-            ),
-            child: const Icon(Icons.flight_takeoff_rounded, color: AppColors.primary, size: 24),
-          ),
-          const SizedBox(width: AppDimensions.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(trip.title, style: AppTextStyles.heading3, overflow: TextOverflow.ellipsis),
-                    ),
-                    AppBadge(label: trip.status, variant: trip.status),
-                  ],
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: AppColors.primaryMuted,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(AppDimensions.radiusLg),
+                  topRight: Radius.circular(AppDimensions.radiusLg),
                 ),
-                const SizedBox(height: AppDimensions.xs),
-                Text(trip.destination, style: AppTextStyles.body.copyWith(color: AppColors.textMuted)),
-                const SizedBox(height: AppDimensions.xs),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${AppDateUtils.formatShortDate(trip.startDate)} - ${AppDateUtils.formatShortDate(trip.endDate)}',
-                      style: AppTextStyles.small,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha:0.1),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                     ),
-                    const SizedBox(width: AppDimensions.md),
-                    const Icon(Icons.people_alt_rounded, size: 12, color: AppColors.textMuted),
-                    const SizedBox(width: 4),
-                    Text('${trip.memberIds.length} members', style: AppTextStyles.small),
-                  ],
-                )
-              ],
+                    child: const Icon(Icons.flight_takeoff, color: AppColors.primary, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          trip.title,
+                          style: AppTextStyles.heading3.copyWith(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          trip.destination,
+                          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _statusColor.withValues(alpha:0.1),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+                    ),
+                    child: Text(
+                      trip.status.toUpperCase(),
+                      style: TextStyle(
+                        color: _statusColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppDimensions.sm),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 16, color: AppColors.textMuted.withValues(alpha:0.6)),
+                  const SizedBox(width: 6),
+                  Text(
+                    DateUtils.formatDateRange(trip.startDate, trip.endDate),
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.people_outline, size: 16, color: AppColors.textMuted.withValues(alpha:0.6)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${trip.memberIds.length} members',
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryMuted,
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+                    ),
+                    child: Text(
+                      '${trip.durationDays} days',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Color get _statusColor {
+    switch (trip.status) {
+      case 'active':
+        return AppColors.success;
+      case 'upcoming':
+        return AppColors.primary;
+      default:
+        return AppColors.textMuted;
+    }
   }
 }

@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
-import '../../theme/app_dimensions.dart';
 
 class AppLoader extends StatelessWidget {
-  final String? label;
+  final double size;
+  final Color? color;
+  final double strokeWidth;
 
-  const AppLoader({super.key, this.label});
+  const AppLoader({
+    super.key,
+    this.size = 24,
+    this.color,
+    this.strokeWidth = 2.5,
+  });
 
   @override
-  Widget build(BuildContext StatelessWidgetContext) {
+  Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
-          if (label != null) ...[
-            const SizedBox(height: AppDimensions.md),
-            Text(label!, style: AppTextStyles.body.copyWith(color: AppColors.primary)),
-          ]
-        ],
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: CircularProgressIndicator(
+          strokeWidth: strokeWidth,
+          valueColor: AlwaysStoppedAnimation<Color>(color ?? AppColors.primary),
+        ),
       ),
     );
   }

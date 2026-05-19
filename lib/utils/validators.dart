@@ -1,38 +1,48 @@
 class Validators {
-  static String? validateRequired(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName required hai';
-    }
-    return null;
-  }
-
-  static String? validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Email address required hai';
-    }
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'Valid email address enter karein';
-    }
-    return null;
-  }
-
-  static String? validatePassword(String? value) {
+  static String? email(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password required hai';
+      return 'Email is required';
+    }
+    final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Please enter a valid email';
+    }
+    return null;
+  }
+
+  static String? password(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
     }
     if (value.length < 6) {
-      return 'Password kam az kam 6 characters ka hona chahiye';
+      return 'Password must be at least 6 characters';
     }
     return null;
   }
 
-  static String? validateConfirmPassword(String? value, String password) {
+  static String? name(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Confirm password required hai';
+      return 'Name is required';
     }
-    if (value != password) {
-      return 'Passwords match nahi kar rahe';
+    if (value.length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+    return null;
+  }
+
+  static String? required(String? value, {String fieldName = 'This field'}) {
+    if (value == null || value.isEmpty) {
+      return '$fieldName is required';
+    }
+    return null;
+  }
+
+  static String? tripTitle(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Trip title is required';
+    }
+    if (value.length < 3) {
+      return 'Title must be at least 3 characters';
     }
     return null;
   }

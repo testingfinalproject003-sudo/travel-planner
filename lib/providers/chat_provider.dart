@@ -1,47 +1,77 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/message_model.dart';
 import '../services/chat_service.dart';
+import '../models/message_model.dart';
 
 class ChatProvider extends ChangeNotifier {
   final ChatService _chatService = ChatService();
-  List<MessageModel> _messages = [];
   bool _isLoading = false;
-  StreamSubscription<List<MessageModel>>? _chatSubscription;
+  String? _error;
 
-  List<MessageModel> get messages => _messages;
   bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  void loadMessages(String tripId) {
-    _isLoading = true;
-    _chatSubscription?.cancel();
-    _chatSubscription = _chatService.getMessages(tripId).listen((msgList) {
-      _messages = msgList;
-      _isLoading = false;
-      notifyListeners();
-    }, onError: (_) {
-      _isLoading = false;
-      notifyListeners();
-    });
+  /// 🔥 Clear all state (called on logout)
+  void clear() {
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
   }
 
-  Future<void> sendMessage(String tripId, String text, String senderId, String senderName) async {
+  /// 🔥 Get messages (works for both trip and private chats)
+  Stream<List<MessageModel>> getMessages(String chatId) {
+    return _chatService.getMessages(chatId);
+  }
+
+  /// 🔥 Get user's all chats
+  Stream<List<Map<String, dynamic>>> getUserChats(String userId) {
+    return _chatService.getUserChats(userId);
+  }
+
+  /// 🔥 Send message
+  Future<void> sendMessage({
+    required String chatId,
+    required String text,
+    required String senderId,
+    required String senderName,
+    required String senderInitials,
+  }) async {
     if (text.trim().isEmpty) return;
-
-    final message = MessageModel(
-      id: '',
-      text: text.trim(),
-      senderId: senderId,
-      senderName: senderName,
-      type: 'text',
-      timestamp: DateTime.now(),
-    );
-    await _chatService.sendMessage(tripId, message);
+    _setLoading(true);
+    try {
+      await _chatService.sendMessage(
+        chatId: chatId,
+        text: text.trim(),
+        senderId: senderId,
+        senderName: senderName,
+        senderInitials: senderInitials,
+      );
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    }
+    _setLoading(false);
   }
 
-  @override
-  void dispose() {
-    _chatSubscription?.cancel();
-    super.dispose();
+  /// 🔥 Create trip group chat
+  Future<void> createTripChat(String tripId, String destination, List<String> memberIds) async {
+    try {
+      await _chatService.createTripGroupChat(
+        tripId: tripId,
+        destination: destination,
+        memberIds: memberIds,
+      );
+    } catch (e) {
+      _error = e.toString();
+    }
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
   }
 }
