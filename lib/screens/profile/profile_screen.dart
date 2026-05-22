@@ -2,14 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import '../../theme/app_dimensions.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/trip_provider.dart';
-import '../../providers/friend_provider.dart';
-// import '../../providers/chat_provider.dart';
-import '../../navigation/app_router.dart';
-import '../../widgets/common/app_avatar.dart';
-import '../../widgets/common/app_button.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -19,164 +12,192 @@ class ProfileScreen extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
     final user = authProvider.user;
 
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
+        foregroundColor: Colors.white,
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              AppAvatar(
-                imageUrl: user?.photoURL,
-                initials: user?.initials ?? '?',
-                size: 100,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 16),
-              Text(
-                user?.name ?? 'User',
-                style: AppTextStyles.heading2,
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: AppColors.primary,
+                    child: Text(
+                      user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    user.name,
+                    style: AppTextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    user.email,
+                    style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                user?.email ?? '',
-                style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                _statCard('Trips', '0', Icons.flight),
+                const SizedBox(width: 12),
+                _statCard('Friends', '0', Icons.people),
+                const SizedBox(width: 12),
+                _statCard('Reviews', '0', Icons.star),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _menuCard([
+              _MenuItem(
+                icon: Icons.edit,
+                title: 'Edit Profile',
+                onTap: () {},
               ),
-              const SizedBox(height: 32),
-              _buildStatsCard(context),
-              const SizedBox(height: 32),
-              AppButton(
-                text: 'Logout',
-                onPressed: () => _handleLogout(context),
-                backgroundColor: AppColors.danger,
-                icon: Icons.logout,
+              _MenuItem(
+                icon: Icons.settings,
+                title: 'Settings',
+                onTap: () {},
               ),
-            ],
-          ),
+              _MenuItem(
+                icon: Icons.help,
+                title: 'Help & Support',
+                onTap: () {},
+              ),
+            ]),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showLogoutDialog(context, authProvider),
+                icon: const Icon(Icons.logout),
+                label: const Text('Logout'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildStatsCard(BuildContext context) {
-    final tripProvider = context.watch<TripProvider>();
-    final friendProvider = context.watch<FriendProvider>();
+  Widget _statCard(String label, String value, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: AppTextStyles.heading2.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(label, style: AppTextStyles.caption),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _menuCard(List<_MenuItem> items) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _StatItem(
-            icon: Icons.card_travel,
-            value: tripProvider.trips.length.toString(),
-            label: 'Trips',
-          ),
-          Container(width: 1, height: 40, color: AppColors.border),
-          _StatItem(
-            icon: Icons.people,
-            value: friendProvider.friendCount.toString(),
-            label: 'Friends',
-          ),
-          Container(width: 1, height: 40, color: AppColors.border),
-          _StatItem(
-            icon: Icons.mail_outline,
-            value: friendProvider.pendingRequestCount.toString(),
-            label: 'Requests',
-          ),
-        ],
+      child: Column(
+        children: items.asMap().entries.map((entry) {
+          final item = entry.value;
+          final isLast = entry.key == items.length - 1;
+          return Column(
+            children: [
+              ListTile(
+                leading: Icon(item.icon, color: AppColors.primary),
+                title: Text(item.title, style: AppTextStyles.body),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                onTap: item.onTap,
+              ),
+              if (!isLast) const Divider(height: 1, indent: 56),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Future<void> _handleLogout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+  void _showLogoutDialog(BuildContext context, AuthProvider authProvider) {
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Logout', style: AppTextStyles.heading2),
-        content: Text(
-          'Are you sure you want to logout?',
-          style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-        ),
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              foregroundColor: AppColors.white,
-            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await authProvider.logout();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Logout'),
           ),
         ],
       ),
     );
-
-    if (confirmed == true && context.mounted) {
-      // Clear providers that cache user-specific data
-      context.read<TripProvider>().clear();
-      context.read<FriendProvider>().clear();
-      // ✅ FIXED: Removed context.read<ChatProvider>().clear() — method doesn't exist
-      // ChatProvider doesn't cache user data; streams auto-reset on new user
-
-      // Sign out
-      await context.read<AuthProvider>().signOut();
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logged out successfully')),
-        );
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          AppRouter.splash,
-          (route) => false,
-        );
-      }
-    }
   }
 }
 
-class _StatItem extends StatelessWidget {
+class _MenuItem {
   final IconData icon;
-  final String value;
-  final String label;
+  final String title;
+  final VoidCallback onTap;
 
-  const _StatItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.primary, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: AppTextStyles.heading3.copyWith(fontSize: 20),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTextStyles.caption,
-        ),
-      ],
-    );
-  }
+  _MenuItem({required this.icon, required this.title, required this.onTap});
 }

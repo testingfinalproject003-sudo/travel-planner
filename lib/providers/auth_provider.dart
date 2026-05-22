@@ -24,6 +24,26 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  /// Check current login status
+  Future<bool> checkLoginStatus() async {
+    _setLoading(true);
+    try {
+      final currentUser = await _authService.getCurrentUser();
+      _user = currentUser;
+      _setLoading(false);
+      return _user != null;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Alias for signOut - logout method
+  Future<void> logout() async {
+    return signOut();
+  }
+
   /// 🔥 Clear state (called on logout before signOut)
   void clear() {
     _user = null;

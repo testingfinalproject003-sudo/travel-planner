@@ -1,16 +1,16 @@
 class Constants {
   // API Keys — replace with real keys
-  static const String openWeatherApiKey = 'Api key ';
-  static const String geoDbHost = 'wft-geo-db.p.rapidapi.com';
+  static const String openWeatherApiKey = '';
+  static const String geoDbHost = '';
   
   // Foursquare Places API
-  static const String foursquareApiKey = 'Api key'; // Replace with real key
+  static const String foursquareApiKey = ''; // Replace with real key
   static const String foursquareBaseUrl = 'https://api.foursquare.com/v3';
   
   // OpenRouter AI API
   static const String openRouterApiKey = ''; // Replace with real key
   static const String openRouterBaseUrl = 'https://openrouter.ai/api/v1';
-  static const String openRouterModel = 'openrouter/free'; // Uses free tier models
+  static const String openRouterModel = 'openai/gpt-4o-mini'; // Uses free tier models
 
   // App rules
   static const int minFriendsToCreateTrip = 1;

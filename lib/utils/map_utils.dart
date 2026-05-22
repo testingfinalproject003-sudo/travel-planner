@@ -1,12 +1,13 @@
 import 'package:latlong2/latlong.dart';
 import '../models/activity_model.dart';
 import 'package:flutter_map/flutter_map.dart';
+
 class MapUtils {
   static List<LatLng> getActivityLocations(List<ActivityModel> activities) {
-    return activities
-        .where((a) => a.locationLat != null && a.locationLng != null)
-        .map((a) => LatLng(a.locationLat!, a.locationLng!))
-        .toList();
+    // ActivityModel mein lat/lng fields nahi hain, sirf locationName hai
+    // Map ke liye lat/lng required hain - abhi empty return karte hain
+    
+    return [];
   }
 
   static LatLng getCenterPoint(List<LatLng> points) {
@@ -21,7 +22,6 @@ class MapUtils {
   }
 
   static double zoomForDistance(double distanceInDegrees) {
-    // Approximate zoom based on lat/lng distance
     if (distanceInDegrees <= 0.001) return 18;
     if (distanceInDegrees <= 0.01) return 16;
     if (distanceInDegrees <= 0.05) return 14;
@@ -60,7 +60,7 @@ class MapUtils {
   }
 
   static String estimateWalkingTime(double distanceKm) {
-    final minutes = (distanceKm / 5) * 60; // 5 km/h walking speed
+    final minutes = (distanceKm / 5) * 60;
     if (minutes < 60) {
       return '${minutes.round()} min walk';
     }

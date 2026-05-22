@@ -20,7 +20,7 @@ enum TripPlanSource { home, chat, explore }
 class TripPlanBottomSheet extends StatefulWidget {
   final TripPlanSource source;
   final String? prefillDestination;
-  final String? chatId; // Required if source == chat
+  final String? chatId;
   final List<String>? preselectedMemberIds;
 
   const TripPlanBottomSheet({
@@ -89,8 +89,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
       });
     }
   }
-
-  
 
   Future<bool?> _showChatSelectionDialog(List<dynamic> friends, List<String> memberIds) async {
     return showDialog<bool>(
@@ -197,7 +195,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   width: 40,
@@ -210,7 +207,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
               ),
               const SizedBox(height: 20),
 
-              // Title
               Text(
                 widget.source == TripPlanSource.chat
                     ? 'Plan Trip in Chat'
@@ -224,7 +220,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
               ),
               const SizedBox(height: 24),
 
-              // Destination
               AppInput(
                 controller: _destinationController,
                 labelText: 'Destination',
@@ -238,7 +233,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Title (optional)
               AppInput(
                 controller: _titleController,
                 labelText: 'Trip Title (optional)',
@@ -247,7 +241,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Date pickers
               Row(
                 children: [
                   Expanded(
@@ -271,7 +264,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
               ),
               const SizedBox(height: 20),
 
-              // Members selector (if not from chat with preselected)
               if (widget.source != TripPlanSource.chat) ...[
                 Text('Invite Friends', style: AppTextStyles.sectionTitle),
                 const SizedBox(height: 8),
@@ -326,7 +318,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
                 const SizedBox(height: 20),
               ],
 
-              // AI Suggestion button
               if (_aiAdvice == null) ...[
                 SizedBox(
                   width: double.infinity,
@@ -411,7 +402,6 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
 
               const SizedBox(height: 24),
 
-              // Confirm button
               AppButton(
                 text: widget.source == TripPlanSource.chat
                     ? 'Send Trip Proposal'
@@ -426,7 +416,8 @@ class _TripPlanBottomSheetState extends State<TripPlanBottomSheet> {
       ),
     );
   }
-Future<void> _confirm() async {
+
+  Future<void> _confirm() async {
     final authProvider = context.read<AuthProvider>();
     final tripProvider = context.read<TripProvider>();
     final chatProvider = context.read<ChatProvider>();
@@ -450,12 +441,10 @@ Future<void> _confirm() async {
     });
 
     try {
-      // ✅ FIXED: Always include sender in members
       final memberIds = <String>{user.uid, ..._selectedMemberIds}.toList();
       final weather = await _weatherService.getWeather(destination);
 
       if (widget.source == TripPlanSource.chat && widget.chatId != null) {
-        // Send proposal to existing chat
         await chatProvider.sendTripPlanProposal(
           chatId: widget.chatId!,
           senderId: user.uid,
@@ -464,7 +453,7 @@ Future<void> _confirm() async {
           destination: destination,
           startDate: _startDate,
           endDate: _endDate,
-          memberIds: memberIds, // All selected friends + sender
+          memberIds: memberIds,
           weatherData: weather,
         );
 
@@ -472,7 +461,6 @@ Future<void> _confirm() async {
           Navigator.pop(context, {'sentToChat': true, 'memberCount': memberIds.length});
         }
       } else {
-        // From Home or Explore - ask to select chat or create directly
         final shouldSendToChat = await _showChatSelectionDialog(
           friendProvider.friends,
           memberIds,
@@ -480,11 +468,10 @@ Future<void> _confirm() async {
 
         if (shouldSendToChat == null) {
           setState(() => _isLoading = false);
-          return; // User cancelled
+          return;
         }
 
         if (shouldSendToChat) {
-          // Send to selected chat
           final selectedChatId = await _showChatPicker();
           if (selectedChatId == null) {
             setState(() => _isLoading = false);
@@ -507,7 +494,6 @@ Future<void> _confirm() async {
             Navigator.pop(context, {'sentToChat': true, 'chatId': selectedChatId});
           }
         } else {
-          // Create trip directly
           final trip = TripModel(
             id: '',
             title: _titleController.text.trim().isNotEmpty
@@ -523,10 +509,10 @@ Future<void> _confirm() async {
             memberConfirmations: {user.uid: true},
           );
 
-          final tripId = await tripProvider.createTrip(trip);
+          await tripProvider.createTrip(trip);
 
-          if (mounted && tripId != null) {
-            Navigator.pop(context, {'tripId': tripId, 'created': true});
+          if (mounted) {
+            Navigator.pop(context, {'created': true});
           }
         }
       }

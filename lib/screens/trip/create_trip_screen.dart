@@ -27,7 +27,7 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   DateTime _endDate = DateTime.now().add(const Duration(days: 3));
   final List<String> _selectedFriendIds = [];
   bool _selectAllFriends = false;
-  bool _sendToChat = true; // New option
+  bool _sendToChat = true;
 
   @override
   void dispose() {
@@ -43,11 +43,13 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     final friendProvider = context.watch<FriendProvider>();
     final tripProvider = context.watch<TripProvider>();
     final friends = friendProvider.friends;
-    final userId = authProvider.user?.uid;
+    final user = authProvider.user;
 
-    if (userId == null) {
+    if (user == null) {
       return const Scaffold(body: Center(child: Text('Please login')));
     }
+
+    // final userId = user.uid;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -70,7 +72,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Trip Title
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -81,7 +82,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Destination
             TextField(
               controller: _destinationController,
               decoration: const InputDecoration(
@@ -92,7 +92,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Date Selection
             Row(
               children: [
                 Expanded(
@@ -114,7 +113,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Notes
             TextField(
               controller: _notesController,
               maxLines: 3,
@@ -126,7 +124,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Send to Chat Option
             SwitchListTile(
               title: const Text('Send trip plan to chat for voting'),
               subtitle: const Text('Members can vote before trip is created'),
@@ -136,7 +133,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
             ),
             const Divider(),
 
-            // Friend Selection
             Text('Select Friends', style: AppTextStyles.sectionTitle),
             const SizedBox(height: 8),
 
@@ -161,7 +157,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 ),
               )
             else ...[
-              // Select All Option
               CheckboxListTile(
                 title: const Text('Select All Friends'),
                 value: _selectAllFriends,
@@ -178,7 +173,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                 },
               ),
               const Divider(),
-              // Individual Friends
               ...friends.map((friend) => CheckboxListTile(
                 secondary: AppAvatar(
                   imageUrl: friend.photoURL,
@@ -246,22 +240,21 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     final authProvider = context.read<AuthProvider>();
     final tripProvider = context.read<TripProvider>();
     final chatProvider = context.read<ChatProvider>();
-    final userId = authProvider.user!.uid;
+    final user = authProvider.user;
 
-    // Include creator in members
+    if (user == null) return;
+
+    final userId = user.uid;
     final memberIds = [userId, ..._selectedFriendIds];
 
     if (_sendToChat && _selectedFriendIds.isNotEmpty) {
-      // Send proposal to chat for voting instead of creating trip directly
-      // Create a temporary chat or use existing group chat
       final chatId = 'proposal_${DateTime.now().millisecondsSinceEpoch}';
       
-      // Create the chat first
       await chatProvider.sendTripPlanProposal(
         chatId: chatId,
         senderId: userId,
-        senderName: authProvider.user!.name,
-        senderInitials: authProvider.user!.initials,
+        senderName: user.name,
+        senderInitials: user.initials,
         destination: _destinationController.text.trim(),
         startDate: _startDate,
         endDate: _endDate,
@@ -275,7 +268,6 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         Navigator.pushReplacementNamed(context, AppRouter.chatList);
       }
     } else {
-      // Create trip directly
       final trip = TripModel(
         id: '',
         title: _titleController.text.trim(),
@@ -290,17 +282,21 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
         memberConfirmations: {userId: true},
       );
 
-      final tripId = await tripProvider.createTrip(trip);
+      try {
+        await tripProvider.createTrip(trip);
 
-      if (tripId != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip created successfully!')),
-        );
-        Navigator.pushReplacementNamed(context, AppRouter.main);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${tripProvider.error}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Trip created successfully!')),
+          );
+          Navigator.pushReplacementNamed(context, AppRouter.main);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
       }
     }
   }

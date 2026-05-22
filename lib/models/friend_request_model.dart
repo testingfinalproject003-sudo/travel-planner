@@ -1,3 +1,5 @@
+// lib/models/friend_request_model.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FriendRequestModel {
@@ -6,9 +8,9 @@ class FriendRequestModel {
   final String fromUserName;
   final String fromUserEmail;
   final String toUserId;
-  final String? toUserEmail;
+  final String toUserEmail;
   final String status;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   FriendRequestModel({
     required this.id,
@@ -16,21 +18,22 @@ class FriendRequestModel {
     required this.fromUserName,
     required this.fromUserEmail,
     required this.toUserId,
-    this.toUserEmail,
+    required this.toUserEmail,
     this.status = 'pending',
-    required this.createdAt,
+    this.createdAt,
   });
 
-  factory FriendRequestModel.fromMap(Map<String, dynamic> map, String docId) {
+  /// ✅ 2 arguments: data + docId
+  factory FriendRequestModel.fromMap(Map<String, dynamic> data, String docId) {
     return FriendRequestModel(
       id: docId,
-      fromUserId: map['fromUserId'] ?? '',
-      fromUserName: map['fromUserName'] ?? '',
-      fromUserEmail: map['fromUserEmail'] ?? '',
-      toUserId: map['toUserId'] ?? '',
-      toUserEmail: map['toUserEmail'],
-      status: map['status'] ?? 'pending',
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      fromUserId: data['fromUserId'] ?? '',
+      fromUserName: data['fromUserName'] ?? 'Unknown',
+      fromUserEmail: data['fromUserEmail'] ?? '',
+      toUserId: data['toUserId'] ?? '',
+      toUserEmail: data['toUserEmail'] ?? '',
+      status: data['status'] ?? 'pending',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -42,7 +45,7 @@ class FriendRequestModel {
       'toUserId': toUserId,
       'toUserEmail': toUserEmail,
       'status': status,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
     };
   }
 }
