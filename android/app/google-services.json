@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "256992643139",
-    "project_id": "travel-planner-ff85d",
-    "storage_bucket": "travel-planner-ff85d.firebasestorage.app"
+    "project_number": "768428763447",
+    "project_id": "genz-go",
+    "storage_bucket": "genz-go.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:256992643139:android:e08310f8b4bc398de56cf6",
+        "mobilesdk_app_id": "1:768428763447:android:bcc84aa66c2bf0477952b2",
         "android_client_info": {
-          "package_name": "com.example.travel_planner"
+          "package_name": "com.example.genz_go"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyC_sMe0Dgd63cKUVb47rXDaTcvVyYkWatc"
+          "current_key": "AIzaSyAzm0QXkAqRQLsWlcFuJU3k2tAAkEl8VGI"
         }
       ],
       "services": {

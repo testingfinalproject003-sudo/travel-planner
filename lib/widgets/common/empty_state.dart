@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
+import '../../core/constants/app_colors.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-  final Widget? action;
+  final VoidCallback? onAction;
+  final String? actionLabel;
 
   const EmptyState({
     super.key,
     required this.icon,
     required this.title,
     this.subtitle,
-    this.action,
+    this.onAction,
+    this.actionLabel,
   });
 
   @override
@@ -24,20 +25,46 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: AppColors.textMuted.withValues(alpha:0.4)),
-            const SizedBox(height: 16),
-            Text(title, style: AppTextStyles.heading3, textAlign: TextAlign.center),
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 48,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 8),
               Text(
                 subtitle!,
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted),
                 textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
               ),
             ],
-            if (action != null) ...[
+            if (onAction != null && actionLabel != null) ...[
               const SizedBox(height: 24),
-              action!,
+              ElevatedButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.add),
+                label: Text(actionLabel!),
+              ),
             ],
           ],
         ),

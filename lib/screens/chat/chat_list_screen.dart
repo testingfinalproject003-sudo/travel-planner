@@ -1,156 +1,272 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
-import '../../theme/app_dimensions.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/chat_provider.dart';
-import '../../navigation/app_router.dart';
-import '../../widgets/common/app_avatar.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/chat_provider.dart';
 
 class ChatListScreen extends StatelessWidget {
   const ChatListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.read<AuthProvider>();
-    final chatProvider = context.read<ChatProvider>();
-    final userId = authProvider.user?.uid;
+    final authProvider = context.watch<AuthProvider>();
+    final chatProvider = context.watch<ChatProvider>();
+    final user = authProvider.user;
 
-    if (userId == null) {
-      return const Scaffold(
-        body: Center(child: Text('Please login')),
-      );
+    if (user != null) {
+      chatProvider.loadUserChats(user.uid);
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: const Text('Messages'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person_add),
-            onPressed: () => Navigator.pushNamed(context, AppRouter.addFriend),
+            icon: const Icon(Icons.search),
+            onPressed: () => _showSearchDialog(context),
           ),
         ],
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: chatProvider.getUserChats(userId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: chatProvider.chats.isEmpty
+          ? _buildEmptyState()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: chatProvider.chats.length,
+              itemBuilder: (context, index) {
+                final chat = chatProvider.chats[index];
+                return _buildChatTile(context, chat);
+              },
+            ),
+    );
+  }
 
-          final chats = snapshot.data ?? [];
+  void _showSearchDialog(BuildContext context) {
+    final searchController = TextEditingController();
+    final chatProvider = context.read<ChatProvider>();
+    final allChats = chatProvider.chats;
+    List<Map<String, dynamic>> searchResults = [];
 
-          if (chats.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat_bubble_outline,
-                      size: 64, color: AppColors.textMuted.withValues(alpha: 0.3)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No messages yet',
-                    style: AppTextStyles.heading3.copyWith(color: AppColors.textMuted),
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Search Chats'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or message...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              searchController.clear();
+                              setDialogState(() => searchResults = []);
+                            },
+                          )
+                        : null,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add friends to start chatting',
-                    style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: chats.length,
-            itemBuilder: (context, index) {
-              final chat = chats[index];
-              final isPrivate = chat['type'] == 'private';
-              final members = List<String>.from(chat['members'] ?? []);
-              final otherUserId = members.firstWhere(
-                (id) => id != userId,
-                orElse: () => '',
-              );
-
-              // Get chat name - for private chats, show friend's name
-              String chatName = chat['name'] ?? 'Unknown';
-              if (isPrivate && chat['memberNames'] != null) {
-                final memberNames = Map<String, dynamic>.from(chat['memberNames']);
-                chatName = memberNames[otherUserId] ?? chatName;
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: ListTile(
-                  leading: AppAvatar(
-                    initials: isPrivate && otherUserId.isNotEmpty 
-                        ? chatName.isNotEmpty ? chatName[0].toUpperCase() : '?' 
-                        : 'T',
-                    size: AppDimensions.avatarMd,
-                  ),
-                  title: Text(
-                    chatName,
-                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    chat['lastMessage'] ?? 'No messages yet',
-                    style: AppTextStyles.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: chat['lastMessageTime'] != null
-                      ? Text(
-                          _formatTime(chat['lastMessageTime']),
-                          style: AppTextStyles.caption,
-                        )
-                      : null,
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppRouter.chat,
-                      arguments: {
-                        'chatId': chat['id'],
-                        'chatName': chatName,
-                        'isTripChat': !isPrivate,
-                      },
-                    );
+                  onChanged: (query) {
+                    if (query.isEmpty) {
+                      setDialogState(() => searchResults = []);
+                      return;
+                    }
+                    final results = allChats.where((chat) {
+                      final name = (chat['name'] ?? '').toString().toLowerCase();
+                      final lastMessage = (chat['lastMessage'] ?? '').toString().toLowerCase();
+                      final searchLower = query.toLowerCase();
+                      return name.contains(searchLower) || lastMessage.contains(searchLower);
+                    }).toList();
+                    setDialogState(() => searchResults = results);
                   },
                 ),
-              );
-            },
-          );
+                const SizedBox(height: 16),
+                if (searchResults.isNotEmpty)
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: searchResults.length,
+                      itemBuilder: (context, index) {
+                        final chat = searchResults[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                            child: Text(
+                              (chat['name'] ?? '?')[0].toUpperCase(),
+                              style: TextStyle(color: AppColors.primary),
+                            ),
+                          ),
+                          title: Text(chat['name'] ?? 'Unknown'),
+                          subtitle: Text(
+                            chat['lastMessage'] ?? 'No messages',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            context.push('/chat-detail', extra: {
+                              'chatId': chat['id'],
+                              'chatName': chat['name'],
+                              'tripId': chat['tripId'],
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  )
+                else if (searchController.text.isNotEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('No results found'),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatTile(BuildContext context, Map<String, dynamic> chat) {
+    final lastMessage = chat['lastMessage'] as String?;
+    final lastMessageTime = chat['lastMessageTime'] != null
+        ? (chat['lastMessageTime'] as dynamic).toDate() as DateTime
+        : null;
+    final chatName = chat['name'] as String? ?? 'Unknown';
+    final chatType = chat['type'] as String? ?? 'group';
+    final memberCount = (chat['memberIds'] as List<dynamic>?)?.length ?? 0;
+
+    String timeText = '';
+    if (lastMessageTime != null) {
+      final now = DateTime.now();
+      final diff = now.difference(lastMessageTime);
+      if (diff.inDays > 0) {
+        timeText = DateFormat('MMM dd').format(lastMessageTime);
+      } else if (diff.inHours > 0) {
+        timeText = '${diff.inHours}h ago';
+      } else {
+        timeText = '${diff.inMinutes}m ago';
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Stack(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Icon(
+                  chatType == 'trip' ? Icons.flight : Icons.chat_bubble,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+            if (memberCount > 1)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: AppColors.success,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$memberCount',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        title: Text(
+          chatName,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          lastMessage ?? 'No messages yet',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (timeText.isNotEmpty)
+              Text(
+                timeText,
+                style: TextStyle(fontSize: 12, color: AppColors.textLight),
+              ),
+            const SizedBox(height: 4),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+        onTap: () {
+          context.push('/chat-detail', extra: {
+            'chatId': chat['id'] as String,
+            'chatName': chatName,
+            'tripId': chat['tripId'] as String?,
+          });
         },
       ),
     );
   }
 
-  String _formatTime(dynamic timestamp) {
-    if (timestamp == null) return '';
-
-    DateTime date;
-    if (timestamp is Timestamp) {
-      date = timestamp.toDate();
-    } else if (timestamp is DateTime) {
-      date = timestamp;
-    } else {
-      return '';
-    }
-
-    final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    }
-    return '${date.day}/${date.month}';
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.chat_bubble_outline, size: 48, color: AppColors.primary),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Messages Yet',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Start a trip or add friends to chat!',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
   }
 }

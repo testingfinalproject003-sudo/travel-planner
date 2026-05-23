@@ -1,30 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
-import '../../models/message_model.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/chat_provider.dart';
-import '../../services/location_service.dart';
+import 'package:provider/provider.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/models/message_model.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/chat_provider.dart';
+import '../../core/services/notification_service.dart';
 import '../../widgets/chat/message_bubble.dart';
-import '../../widgets/chat/chat_input_bar.dart';
-import '../../widgets/trip/trip_plan_bottom_sheet.dart';
-import '../../navigation/app_router.dart';
+import '../../widgets/chat/vote_buttons.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
   final String chatName;
-  final String? subtitle;
-  final bool isTripChat;
+  final String? tripId;
 
   const ChatScreen({
     super.key,
     required this.chatId,
     required this.chatName,
-    this.subtitle,
-    this.isTripChat = false,
+    this.tripId,
   });
 
   @override
@@ -32,12 +27,22 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ScrollController _scrollController = ScrollController();
-  final LocationService _locationService = LocationService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _showProposalForm = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.loadChatMessages(widget.chatId);
+    });
+  }
 
   @override
   void dispose() {
+    _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -45,518 +50,472 @@ class _ChatScreenState extends State<ChatScreen> {
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        0,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
     final authProvider = context.read<AuthProvider>();
     final chatProvider = context.read<ChatProvider>();
-    final userId = authProvider.user?.uid;
+    final user = authProvider.user;
 
-    if (userId == null) {
-      return const Scaffold(
-        body: Center(child: Text('Please login to view chat')),
+    if (user == null) return;
+
+    _messageController.clear();
+
+    await chatProvider.sendMessage(
+      chatId: widget.chatId,
+      senderId: user.uid,
+      senderName: user.name,
+      content: text,
+      senderPhotoUrl: user.photoUrl,
+    );
+
+    _scrollToBottom();
+  }
+
+  Future<void> _sendTripProposal() async {
+    final authProvider = context.read<AuthProvider>();
+    final chatProvider = context.read<ChatProvider>();
+    final user = authProvider.user;
+
+    if (user == null) return;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const TripProposalDialog(),
+    );
+
+    if (result != null) {
+      final memberIds = (result['memberIds'] as List<dynamic>?)?.cast<String>() ?? [user.uid];
+      
+      await chatProvider.sendTripProposal(
+        chatId: widget.chatId,
+        senderId: user.uid,
+        senderName: user.name,
+        destination: result['destination'] as String,
+        startDate: result['startDate'] as DateTime,
+        endDate: result['endDate'] as DateTime,
+        memberIds: memberIds,
+        notes: result['notes'] as String?,
       );
+
+      NotificationService.showToast('Trip proposal sent!');
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _voteOnProposal(String messageId, bool vote) async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.user;
+    if (user == null) return;
+
+    final chatProvider = context.read<ChatProvider>();
+    await chatProvider.voteOnProposal(messageId, user.uid, vote);
+
+    NotificationService.showToast(vote ? 'You voted YES!' : 'You voted NO');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final chatProvider = context.watch<ChatProvider>();
+    final user = authProvider.user;
+    final messages = chatProvider.messages;
+
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.primaryDark,
-        foregroundColor: AppColors.white,
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              widget.isTripChat ? Icons.flight : Icons.person,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.chatName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (widget.subtitle != null)
-                    Text(
-                      widget.subtitle!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.white.withValues(alpha: 0.7),
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  _buildOnlineStatus(),
-                ],
-              ),
+            Text(widget.chatName),
+            Text(
+              '${messages.length} messages',
+              style: TextStyle(fontSize: 12, color: AppColors.textLight),
             ),
           ],
         ),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.white),
-            onSelected: (value) => _handleMenuAction(value, authProvider, chatProvider),
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'plan_trip', child: Text('Plan Trip')),
-              const PopupMenuItem(value: 'location', child: Text('Share Location')),
-              const PopupMenuItem(value: 'map', child: Text('Open Map')),
-              const PopupMenuItem(value: 'add_friend', child: Text('Add Friend to Chat')),
-              if (widget.isTripChat)
-                const PopupMenuItem(value: 'confirm', child: Text('Confirm Plan')),
-            ],
-          ),
+          if (widget.tripId != null)
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: () {
+                context.push('/trip-detail', extra: widget.tripId!);
+              },
+            ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<MessageModel>>(
-              stream: chatProvider.getMessages(widget.chatId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final messages = snapshot.data ?? [];
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.chat_bubble_outline,
-                            size: 48, color: AppColors.textMuted.withValues(alpha: 0.4)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No messages yet',
-                          style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Start the conversation!',
-                          style: AppTextStyles.caption,
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                    final isMe = message.senderId == userId;
-                    final showDateSeparator = index == 0 ||
-                        !_isSameDay(messages[index - 1].timestamp, message.timestamp);
-
-                    return Column(
-                      children: [
-                        if (showDateSeparator)
-                          _DateSeparator(date: message.timestamp),
-                        MessageBubble(
-                          message: message,
-                          isMe: isMe,
-                          currentUserId: userId,
-                          chatId: widget.chatId,
-                          isTripChat: widget.isTripChat,
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
+            child: messages.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    controller: _scrollController,
+                    reverse: true,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      final isMe = message.senderId == user.uid;
+                      
+                      if (message.type == 'trip_proposal') {
+                        return _buildProposalBubble(message, user.uid);
+                      }
+                      
+                      return MessageBubble(
+                        message: message,
+                        isMe: isMe,
+                      );
+                    },
+                  ),
           ),
-          ChatInputBar(
-            onSend: (text) {
-              if (authProvider.user == null) return;
-              chatProvider.sendMessage(
-                chatId: widget.chatId,
-                text: text,
-                senderId: authProvider.user!.uid,
-                senderName: authProvider.user!.name,
-                senderInitials: authProvider.user!.initials,
-              );
-              WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-            },
-            isLoading: chatProvider.isLoading,
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildOnlineStatus() {
-    if (widget.isTripChat) {
-      return StreamBuilder<DocumentSnapshot>(
-        stream: _firestore.collection('chats').doc(widget.chatId).snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox.shrink();
-          
-          final data = snapshot.data!.data() as Map<String, dynamic>?;
-          final members = List<String>.from(data?['members'] ?? []);
-          
-          return StreamBuilder<QuerySnapshot>(
-            stream: _firestore
-                .collection('users')
-                .where(FieldPath.documentId, whereIn: members)
-                .snapshots(),
-            builder: (context, userSnapshot) {
-              if (!userSnapshot.hasData) return const SizedBox.shrink();
-              
-              int onlineCount = 0;
-              for (var doc in userSnapshot.data!.docs) {
-                final userData = doc.data() as Map<String, dynamic>?;
-                final lastSeen = userData?['lastSeen'] as Timestamp?;
-                if (lastSeen != null) {
-                  final lastSeenDate = lastSeen.toDate();
-                  final now = DateTime.now();
-                  if (now.difference(lastSeenDate).inMinutes < 5) {
-                    onlineCount++;
-                  }
-                }
-              }
-              
-              return Text(
-                '$onlineCount/${members.length} online',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.white.withValues(alpha: 0.6),
-                ),
-              );
-            },
-          );
-        },
-      );
-    }
-    
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _firestore.collection('chats').doc(widget.chatId).snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox.shrink();
-        
-        final data = snapshot.data!.data() as Map<String, dynamic>?;
-        final members = List<String>.from(data?['members'] ?? []);
-        final currentUserId = context.read<AuthProvider>().user?.uid;
-        final otherUserId = members.firstWhere(
-          (id) => id != currentUserId,
-          orElse: () => '',
-        );
-        
-        if (otherUserId.isEmpty) return const SizedBox.shrink();
-        
-        return StreamBuilder<DocumentSnapshot>(
-          stream: _firestore.collection('users').doc(otherUserId).snapshots(),
-          builder: (context, userSnapshot) {
-            if (!userSnapshot.hasData || !userSnapshot.data!.exists) {
-              return const SizedBox.shrink();
-            }
-            
-            final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
-            final lastSeen = userData?['lastSeen'] as Timestamp?;
-            final isOnline = userData?['isOnline'] as bool? ?? false;
-            
-            if (isOnline) {
-              return Row(
+          if (_showProposalForm)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.trip_origin, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Create Trip Plan',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() => _showProposalForm = false),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Online',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.white.withValues(alpha: 0.7),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _sendTripProposal,
+                    icon: const Icon(Icons.add_location),
+                    label: const Text('New Trip Proposal'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
                 ],
-              );
-            }
-            
-            if (lastSeen != null) {
-              final lastSeenDate = lastSeen.toDate();
-              final now = DateTime.now();
-              final diff = now.difference(lastSeenDate);
-              String status;
-              if (diff.inMinutes < 1) {
-                status = 'Just now';
-              } else if (diff.inMinutes < 60) {
-                status = '${diff.inMinutes}m ago';
-              } else if (diff.inHours < 24) {
-                status = '${diff.inHours}h ago';
-              } else {
-                status = DateFormat('MMM d').format(lastSeenDate);
-              }
-              return Text(
-                'Last seen $status',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.white.withValues(alpha: 0.5),
+              ),
+            ),
+
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha:0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
                 ),
-              );
-            }
-            
-            return const SizedBox.shrink();
-          },
-        );
-      },
-    );
-  }
-
-  void _handleMenuAction(String value, AuthProvider auth, ChatProvider chat) async {
-    final user = auth.user;
-    if (user == null) return;
-
-    switch (value) {
-      case 'plan_trip':
-        _showTripPlanSheet(chat, user);
-        break;
-      case 'location':
-        _shareLocation(chat, user);
-        break;
-      case 'map':
-        _openMap();
-        break;
-      case 'add_friend':
-        _showAddFriendDialog(context, auth, chat);
-        break;
-      case 'confirm':
-        _sendPlanConfirm(chat, user);
-        break;
-    }
-  }
-
-  // ✅ NEW: Add friend to chat dialog
-  void _showAddFriendDialog(BuildContext context, AuthProvider auth, ChatProvider chat) async {
-    final currentUserId = auth.user?.uid;
-    if (currentUserId == null) return;
-
-    // Get current chat members
-    final chatDoc = await _firestore.collection('chats').doc(widget.chatId).get();
-    if (!chatDoc.exists) return;
-    
-    final chatData = chatDoc.data()!;
-    final currentMembers = List<String>.from(chatData['members'] ?? []);
-
-    // Get user's friends
-    final friendsSnapshot = await _firestore
-        .collection('users')
-        .doc(currentUserId)
-        .collection('friends')
-        .where('status', isEqualTo: 'accepted')
-        .get();
-
-    if (friendsSnapshot.docs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No friends to add')),
-      );
-      return;
-    }
-
-    final friends = friendsSnapshot.docs.map((d) {
-      final data = d.data();
-      return {
-        'id': d.id,
-        'name': data['name'] ?? 'Unknown',
-      };
-    }).where((f) => !currentMembers.contains(f['id'])).toList();
-
-    if (friends.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All friends are already in this chat')),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Friend to Chat'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: friends.length,
-            itemBuilder: (context, index) {
-              final friend = friends[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  child: Text((friend['name'] as String).substring(0, 1)),
-                ),
-                title: Text(friend['name'] as String),
-                onTap: () async {
-                  Navigator.pop(context);
-                  // Add friend to chat
-                  await _firestore.collection('chats').doc(widget.chatId).update({
-                    'members': FieldValue.arrayUnion([friend['id']]),
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${friend['name']} added to chat')),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showTripPlanSheet(ChatProvider chat, dynamic user) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => TripPlanBottomSheet(
-        source: TripPlanSource.chat,
-        chatId: widget.chatId,
-        preselectedMemberIds: widget.isTripChat ? null : [user.uid],
-      ),
-    );
-  }
-
-  Future<void> _shareLocation(ChatProvider chat, dynamic user) async {
-    try {
-      final position = await _locationService.getCurrentPosition();
-      final address = await _locationService.getAddressFromCoords(
-        position.latitude, position.longitude);
-      if (!mounted) return;
-      await chat.sendLocationMessage(
-        chatId: widget.chatId,
-        senderId: user.uid,
-        senderName: user.name,
-        senderInitials: user.initials,
-        locationName: address,
-        lat: position.latitude,
-        lng: position.longitude,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Location error: $e')));
-    }
-  }
-
-  void _openMap() async {
-    String destination = widget.chatName.replaceAll('Trip to ', '');
-    final coords = await _locationService.getCoordsFromAddress(destination);
-    if (!mounted) return;
-
-    Navigator.pushNamed(
-      context,
-      AppRouter.map,
-      arguments: {
-        'destination': destination,
-        'lat': coords?.latitude ?? 33.6844,
-        'lng': coords?.longitude ?? 73.0479,
-      },
-    );
-  }
-
-  void _sendPlanConfirm(ChatProvider chat, dynamic user) {
-    if (!widget.isTripChat) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plan confirmation only available in trip chats')),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Final Plan'),
-        content: const Text('Send confirmation request to all members?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text('Cancel')
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              chat.sendPlanConfirm(
-                chatId: widget.chatId,
-                tripId: widget.chatId,
-                senderId: user.uid,
-                senderName: user.name,
-                senderInitials: user.initials,
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Confirmation request sent!')),
-              );
-            },
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-}
-
-class _DateSeparator extends StatelessWidget {
-  final DateTime date;
-  const _DateSeparator({required this.date});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Expanded(child: Divider(color: AppColors.border)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              _formatDate(date),
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textMuted.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w500,
+              ],
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                    onPressed: () {
+                      setState(() => _showProposalForm = !_showProposalForm);
+                    },
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        filled: true,
+                        fillColor: AppColors.cardBackground,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.send, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          Expanded(child: Divider(color: AppColors.border)),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return 'Today';
+  Widget _buildProposalBubble(MessageModel message, String currentUserId) {
+    final metadata = message.metadata ?? {};
+    final votes = (metadata['votes'] as Map<String, dynamic>?) ?? {};
+    final status = metadata['status'] ?? 'pending';
+    final hasVoted = votes.containsKey(currentUserId);
+    final myVote = hasVoted ? votes[currentUserId] as bool? : null;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha:0.3), width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha:0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.trip_origin, color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Trip Proposal',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                      Text(
+                        'by ${message.senderName}',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: status == 'confirmed'
+                        ? AppColors.success.withValues(alpha:0.1)
+                        : AppColors.warning.withValues(alpha:0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    status == 'confirmed' ? 'Confirmed' : 'Voting',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: status == 'confirmed' ? AppColors.success : AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildProposalDetail(message),
+            const SizedBox(height: 16),
+            VoteButtons(
+              hasVoted: hasVoted,
+              myVote: myVote,
+              onConfirm: () => _voteOnProposal(message.id, true),
+              onDecline: () => _voteOnProposal(message.id, false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProposalDetail(MessageModel message) {
+    final metadata = message.metadata ?? {};
+    final destination = metadata['destination'] ?? 'Unknown';
+    final startDate = metadata['startDate'] != null
+        ? DateTime.parse(metadata['startDate'] as String)
+        : DateTime.now();
+    final endDate = metadata['endDate'] != null
+        ? DateTime.parse(metadata['endDate'] as String)
+        : DateTime.now();
+    final notes = metadata['notes'] as String?;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDetailRow(Icons.location_on, 'Destination', destination),
+        const SizedBox(height: 8),
+        _buildDetailRow(
+          Icons.calendar_today,
+          'Dates',
+          '${DateFormat('MMM dd').format(startDate)} - ${DateFormat('MMM dd').format(endDate)}',
+        ),
+        if (notes != null && notes.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _buildDetailRow(Icons.notes, 'Notes', notes),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text('$label: ', style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+        Expanded(
+          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline, size: 64, color: AppColors.textLight),
+          const SizedBox(height: 16),
+          Text(
+            'Start a conversation',
+            style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Trip Proposal Dialog
+class TripProposalDialog extends StatefulWidget {
+  const TripProposalDialog({super.key});
+
+  @override
+  State<TripProposalDialog> createState() => _TripProposalDialogState();
+}
+
+class _TripProposalDialogState extends State<TripProposalDialog> {
+  final _destinationController = TextEditingController();
+  final _notesController = TextEditingController();
+  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
+  DateTime _endDate = DateTime.now().add(const Duration(days: 3));
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(bool isStart) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isStart ? _startDate : _endDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          _startDate = picked;
+          if (_endDate.isBefore(_startDate)) {
+            _endDate = _startDate.add(const Duration(days: 1));
+          }
+        } else {
+          _endDate = picked;
+        }
+      });
     }
-    final yesterday = now.subtract(const Duration(days: 1));
-    if (date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day) {
-      return 'Yesterday';
-    }
-    return DateFormat('MMM d, yyyy').format(date);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Create Trip Proposal'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _destinationController,
+              decoration: const InputDecoration(
+                labelText: 'Destination',
+                prefixIcon: Icon(Icons.location_on),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('Start Date'),
+              subtitle: Text('${_startDate.day}/${_startDate.month}/${_startDate.year}'),
+              onTap: () => _selectDate(true),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('End Date'),
+              subtitle: Text('${_endDate.day}/${_endDate.month}/${_endDate.year}'),
+              onTap: () => _selectDate(false),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (Optional)',
+                prefixIcon: Icon(Icons.notes),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_destinationController.text.isEmpty) return;
+            Navigator.pop(context, {
+              'destination': _destinationController.text,
+              'startDate': _startDate,
+              'endDate': _endDate,
+              'notes': _notesController.text.isEmpty ? null : _notesController.text,
+              'memberIds': [],
+            });
+          },
+          child: const Text('Send Proposal'),
+        ),
+      ],
+    );
   }
 }

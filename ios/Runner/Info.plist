@@ -2,12 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>This app uses your location to show trips and destinations on the map.</string>
+
+<key>NSCameraUsageDescription</key>
+<string>This app needs camera access to capture travel photos and videos.</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>This app needs gallery access to upload travel memories.</string>
+
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>This app saves travel photos and videos to your gallery.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Travel Planner</string>
+	<string>Genz Go</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +27,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>travel_planner</string>
+	<string>genz_go</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -28,15 +28,9 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -51,19 +45,38 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: '',
-    appId: '1:256992643139:web:35e5eeb0a9e84bc1e56cf6',
-    messagingSenderId: '256992643139',
-    projectId: 'travel-planner-ff85d',
-    authDomain: 'travel-planner-ff85d.firebaseapp.com',
-    storageBucket: 'travel-planner-ff85d.firebasestorage.app',
-    measurementId: 'G-GVXXM2QWDG',
+    appId: '1:768428763447:web:6de6c654fad6314d7952b2',
+    messagingSenderId: '768428763447',
+    projectId: 'genz-go',
+    authDomain: 'genz-go.firebaseapp.com',
+    storageBucket: 'genz-go.firebasestorage.app',
+    measurementId: 'G-B0EEJPSVR3',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: '',
-    appId: '1:256992643139:android:e08310f8b4bc398de56cf6',
-    messagingSenderId: '256992643139',
-    projectId: 'travel-planner-ff85d',
-    storageBucket: 'travel-planner-ff85d.firebasestorage.app',
+    appId: '1:768428763447:android:bcc84aa66c2bf0477952b2',
+    messagingSenderId: '768428763447',
+    projectId: 'genz-go',
+    storageBucket: 'genz-go.firebasestorage.app',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: '',
+    appId: '1:768428763447:ios:9d3265709652cd217952b2',
+    messagingSenderId: '768428763447',
+    projectId: 'genz-go',
+    storageBucket: 'genz-go.firebasestorage.app',
+    iosBundleId: 'com.example.genzGo',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: '',
+    appId: '1:768428763447:web:3f7b6716da4575197952b2',
+    messagingSenderId: '768428763447',
+    projectId: 'genz-go',
+    authDomain: 'genz-go.firebaseapp.com',
+    storageBucket: 'genz-go.firebasestorage.app',
+    measurementId: 'G-V12LNBS2CD',
   );
 }
